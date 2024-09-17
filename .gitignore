@@ -38,3 +38,9 @@ nosetests.xml
 venv
 app.db
 microblog.log*
+.env
+instance/
+uploads/
+logs/
+*.db
+*.sqlite3

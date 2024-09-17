@@ -11,6 +11,8 @@ from app.main.forms import EditProfileForm, EmptyForm, PostForm, SearchForm, \
 from app.models import User, Post, Message, Notification
 from app.translate import translate
 from app.main import bp
+from werkzeug.utils import secure_filename
+import os
 
 
 @bp.before_app_request
@@ -32,41 +34,39 @@ def index():
             language = detect(form.post.data)
         except LangDetectException:
             language = ''
-        post = Post(body=form.post.data, author=current_user,
-                    language=language)
+        post = Post(body=form.post.data, author=current_user, language=language)
+
+        # Prüfen, ob ein Bild hochgeladen wurde
+        if form.image.data and allowed_file(form.image.data.filename):
+            try:
+                filename = secure_filename(form.image.data.filename)
+                image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                
+                # Debugging-Ausgabe
+                print(f"Image to be saved at: {image_path}")
+                
+                form.image.data.save(image_path)  # Speichert das hochgeladene Bild im Upload-Ordner
+                post.image_filename = filename  # Speichert den Dateinamen des Bildes in der Datenbank
+            except Exception as e:
+                # Falls ein Fehler auftritt, wird dieser als Flash-Nachricht ausgegeben
+                flash(_('Error saving image: ') + str(e))
+                return redirect(url_for('main.index'))
+
+        # Speichert den Post in der Datenbank
         db.session.add(post)
         db.session.commit()
         flash(_('Your post is now live!'))
         return redirect(url_for('main.index'))
+    
+    # Beitraege fuer den Feed laden
     page = request.args.get('page', 1, type=int)
     posts = db.paginate(current_user.following_posts(), page=page,
                         per_page=current_app.config['POSTS_PER_PAGE'],
                         error_out=False)
-    next_url = url_for('main.index', page=posts.next_num) \
-        if posts.has_next else None
-    prev_url = url_for('main.index', page=posts.prev_num) \
-        if posts.has_prev else None
-    return render_template('index.html', title=_('Home'), form=form,
-                           posts=posts.items, next_url=next_url,
-                           prev_url=prev_url)
-
-
-@bp.route('/explore')
-@login_required
-def explore():
-    page = request.args.get('page', 1, type=int)
-    query = sa.select(Post).order_by(Post.timestamp.desc())
-    posts = db.paginate(query, page=page,
-                        per_page=current_app.config['POSTS_PER_PAGE'],
-                        error_out=False)
-    next_url = url_for('main.explore', page=posts.next_num) \
-        if posts.has_next else None
-    prev_url = url_for('main.explore', page=posts.prev_num) \
-        if posts.has_prev else None
-    return render_template('index.html', title=_('Explore'),
-                           posts=posts.items, next_url=next_url,
-                           prev_url=prev_url)
-
+    next_url = url_for('main.index', page=posts.next_num) if posts.has_next else None
+    prev_url = url_for('main.index', page=posts.prev_num) if posts.has_prev else None
+    return render_template('index.html', title=_('Home'), form=form, posts=posts.items,
+                           next_url=next_url, prev_url=prev_url)
 
 @bp.route('/user/<username>')
 @login_required
@@ -239,3 +239,20 @@ def notifications():
         'data': n.get_data(),
         'timestamp': n.timestamp
     } for n in notifications]
+
+def allowed_file(filename):
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
+
+@bp.route('/explore')
+@login_required
+def explore():
+    page = request.args.get('page', 1, type=int)
+    query = sa.select(Post).order_by(Post.timestamp.desc())
+    posts = db.paginate(query, page=page,
+                        per_page=current_app.config['POSTS_PER_PAGE'],
+                        error_out=False)
+    next_url = url_for('main.explore', page=posts.next_num) if posts.has_next else None
+    prev_url = url_for('main.explore', page=posts.prev_num) if posts.has_prev else None
+    return render_template('index.html', title=_('Explore'), posts=posts.items,
+                           next_url=next_url, prev_url=prev_url)

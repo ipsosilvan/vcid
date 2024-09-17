@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from flask_babel import _, lazy_gettext as _l
 from app import db
 from app.models import User
+from flask_wtf.file import FileField, FileAllowed
 
 
 class EditProfileForm(FlaskForm):
@@ -31,9 +32,9 @@ class EmptyForm(FlaskForm):
 
 
 class PostForm(FlaskForm):
-    post = TextAreaField(_l('Say something'), validators=[
-        DataRequired(), Length(min=1, max=140)])
-    submit = SubmitField(_l('Submit'))
+    post = TextAreaField('Say something', validators=[DataRequired(), Length(min=1, max=280)])
+    image = FileField('Upload Image', validators=[FileAllowed(['jpg', 'png', 'jpeg', 'gif'], 'Images only!')])
+    submit = SubmitField('Submit')
 
 
 class SearchForm(FlaskForm):

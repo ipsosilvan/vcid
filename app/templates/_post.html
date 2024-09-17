@@ -15,6 +15,13 @@
                     username=user_link, when=moment(post.timestamp).fromNow()) }}
                 <br>
                 <span id="post{{ post.id }}">{{ post.body }}</span>
+
+            	<!-- Ueberpruefen, ob der Post ein Bild enthaelt -->
+            	{% if post.image_filename %}
+                	<br><br>
+                	<img src="{{ url_for('static', filename='uploads/' + post.image_filename) }}" alt="Post image" style="max-width: 500px;">
+            	{% endif %}
+
                 {% if post.language and post.language != g.locale %}
                 <br><br>
                 <span id="translation{{ post.id }}">
